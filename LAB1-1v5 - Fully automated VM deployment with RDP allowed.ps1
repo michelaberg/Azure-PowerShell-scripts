@@ -1,13 +1,3 @@
-﻿# Define general parameters.
-$resourceGroupName = "MyResourceGroup"
-$location = "swedencentral"
-$vmName = "MyVM"
-$vmSize = "Standard_B1s"
-$adminCredential = Get-Credential -Message "Enter the credentials for the VM admin account"
-$vnetName = "MyVNet"
-$subnetName = "MySubnet"
-$nicName = "MyNIC"
-
 # Create ResourceGroup.
 New-AzResourceGroup -Name "MyResourceGroup" -Location "swedencentral"
 
