@@ -44,7 +44,9 @@ $nsg = New-AzNetworkSecurityGroup `
     -Location $location `
     -Name $nsgName
 
-# Create NSG rule
+# Create NSG rule - Note that ALL IP's are allowed for RDP.
+# Change the -SourceAdressPrefix to a trusted IP if you want to use the script.
+# I use my WAN-IP, but you can set any scope you like. The Emperor protects.
 $nsgRuleRDP = New-AzNetworkSecurityRuleConfig `
     -Name "Allow-RDP" `
     -Description "Allow RDP" `
@@ -113,4 +115,4 @@ New-AzVM `
     -VM $vmConfig
 
 # Output the created resources details
-Write-Output "VM '$vmName' with VNet '$vnetName', Subnet '$subnetName', NIC '$nicName', and NSG '$nsgName' created successfully in resource group '$resourceGroupName'."
+Write-Output "VM '$vmName' with VNet '$vnetName', Subnet '$subnetName', NIC '$nicName', and NSG '$nsgName' created successfully in resource group '$resourceGroupName'. For the Emperor."
