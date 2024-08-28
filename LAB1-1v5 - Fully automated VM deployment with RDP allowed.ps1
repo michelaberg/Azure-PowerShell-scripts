@@ -46,7 +46,7 @@ $nsg = New-AzNetworkSecurityGroup `
 
 # Create NSG rule - Note that ALL IP's are allowed for RDP.
 # Change the -SourceAdressPrefix to a trusted IP if you want to use the script.
-# I use my WAN-IP, but you can set any scope you like. The Emperor protects.
+# I use my WAN-IP or VPN-IP, but you can set any scope you like. The Emperor protects.
 $nsgRuleRDP = New-AzNetworkSecurityRuleConfig `
     -Name "Allow-RDP" `
     -Description "Allow RDP" `
