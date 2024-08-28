@@ -1,9 +1,11 @@
+#Script for automating the creation of a cheap VM and NSG-rules for allowing RDP. 
+
 # Create ResourceGroup.
 New-AzResourceGroup -Name "MyResourceGroup" -Location "swedencentral"
 
 # Define general parameters
 $resourceGroupName = "MyResourceGroup"
-$location = "EastUS"
+$location = "swedencentral"
 $vmName = "MyVM"
 $vmSize = "Standard_B1s"  # Use Standard_B1s for the Azure free tier
 $adminCredential = Get-Credential -Message "Enter the credentials for the VM admin account"
@@ -34,6 +36,15 @@ if ($vnet.Subnets.Count -eq 0) {
 
 # Create a public IP address
 $publicIp = New-AzPublicIpAddress -Name "MyPublicIP" -ResourceGroupName $resourceGroupName -Location $location -AllocationMethod Static
+
+# Create a NSG rule to allow RDP - REMEMBER TO CHANGE "-SourceAddressPrefix" for the current WAN-IP you want to connect from, otherwise everything is allowed and that is not secure. The emperor protects - with the right rules.
+$rdp = New-AzNetworkSecurityRuleConfig -Name "Allow-RDP-FromSourceIP" -Description "Allow RDP From SourceIP" -Access Allow -Protocol Tcp -Direction Inbound -Priority 100 -SourceAddressPrefix * -SourcePortRange * -DestinationAddressPrefix * -DestinationPortRange 3389
+
+# Create NSG and assign the rule "Allow-RDP-FromSourceIP.
+$nsg = New-AzNetworkSecurityGroup -ResourceGroupName "MyResourceGroup" -Location "swedencentral" -Name "MyNSG" -SecurityRules $rdp
+
+# Associate the NSG with the subnet created earlier.
+Set-AzVirtualNetworkSubnetConfig -VirtualNetwork $vnet -Name "MySubnet" -AddressPrefix "10.0.0.0/24" -NetworkSecurityGroup $nsg
 
 # Create a network interface card with the valid subnet ID
 if ($vnet.Subnets.Count -gt 0) {
