@@ -101,7 +101,7 @@ $vmConfig = New-AzVMConfig `
 $vmConfig = Set-AzVMOSDisk `
     -VM $vmConfig `
     -Name $osDiskName `
-    -CreateOption "FromImage" ` 
+    -CreateOption "FromImage" `
     -Caching "ReadWrite" `
     -StorageAccountType "osDiskType"
 
