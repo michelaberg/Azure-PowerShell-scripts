@@ -1,5 +1,8 @@
 #Script for automating the creation of a cheap VM and NSG-rules for allowing RDP. 
 
+#Connect/Authenticate your local PS with Azure, you will be prompted for credentials.
+AZ-ConnectAccount
+
 # Create ResourceGroup.
 New-AzResourceGroup -Name "MyResourceGroup" -Location "swedencentral"
 
