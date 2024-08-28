@@ -1,71 +1,116 @@
-#Script for automating the creation of a cheap VM and NSG-rules for allowing RDP. 
+#Updated version for LAB-1 to create a VM and NSG-rule that would allow RDP. Set a trusted IP-adress in "-AdressPrefix" for more security.
 
-#Connect/Authenticate your local PS with Azure, you will be prompted for credentials.
-AZ-ConnectAccount
+# Authenticate to Azure
+Connect-AzAccount
+
+# Define parameters
+$resourceGroupName = "MyResourceGroup"
+$location = "swedencentral"
+$vnetName = "MyVNet"
+$vnetAddressPrefix = "10.0.0.0/16"
+$subnetName = "MySubnet"
+$subnetAddressPrefix = "10.0.0.0/24"
+$nsgName = "MyNSG"
+$nicName = "MyNIC"
+$publicIpName = "MyPublicIP"
+$vmName = "MyVM"
+$vmSize = "Standard_B1s"
+$osDiskName = "MyVMOSDisk" 
+$osDiskType = "Standard_LRS"
+$adminCredential = Get-Credential -Message "Enter the credentials for the VM admin account"
 
 # Create ResourceGroup.
 New-AzResourceGroup -Name "MyResourceGroup" -Location "swedencentral"
 
-# Define general parameters
-$resourceGroupName = "MyResourceGroup"
-$location = "swedencentral"
-$vmName = "MyVM"
-$vmSize = "Standard_B1s"  # Use Standard_B1s for the Azure free tier
-$adminCredential = Get-Credential -Message "Enter the credentials for the VM admin account"
-$vnetName = "MyVNet"
-$subnetName = "MySubnet"
-$nicName = "MyNIC"
+# Create Virtual Network (VNet)
+$vnet = New-AzVirtualNetwork `
+    -ResourceGroupName $resourceGroupName `
+    -Location $location `
+    -Name $vnetName `
+    -AddressPrefix $vnetAddressPrefix
 
-# OS Disk parameters (using defaults provided by the image)
-$osDiskName = "MyVMOSDisk"
-$osDiskType = "Standard_LRS" # Set to Standard_LRS for Standard HDD
+# Add Subnet to VNet
+$subnet = Add-AzVirtualNetworkSubnetConfig `
+    -Name $subnetName `
+    -AddressPrefix $subnetAddressPrefix `
+    -VirtualNetwork $vnet
 
-# Create a virtual network
-$vnet = New-AzVirtualNetwork -ResourceGroupName $resourceGroupName -Location $location -Name $vnetName -AddressPrefix "10.0.0.0/16"
-
-# Add a subnet configuration to the virtual network
-Add-AzVirtualNetworkSubnetConfig -Name $subnetName -AddressPrefix "10.0.0.0/24" -VirtualNetwork $vnet
-
-# Commit the changes to the virtual network
+# Apply the configuration to the VNet
 $vnet = Set-AzVirtualNetwork -VirtualNetwork $vnet
 
-# Validate the subnet
-if ($vnet.Subnets.Count -eq 0) {
-    Write-Error "No subnets found in the virtual network. Please check subnet creation."
-    return
-} else {
-    Write-Output "Subnet ID: $($vnet.Subnets[0].Id)"
-}
+# Create Network Security Group (NSG)
+$nsg = New-AzNetworkSecurityGroup `
+    -ResourceGroupName $resourceGroupName `
+    -Location $location `
+    -Name $nsgName
 
-# Create a public IP address
-$publicIp = New-AzPublicIpAddress -Name "MyPublicIP" -ResourceGroupName $resourceGroupName -Location $location -AllocationMethod Static
+# Create NSG rule
+$nsgRuleRDP = New-AzNetworkSecurityRuleConfig `
+    -Name "Allow-RDP" `
+    -Description "Allow RDP" `
+    -Access "Allow" `
+    -Protocol "Tcp" `
+    -Direction "Inbound" `
+    -Priority 100 `
+    -SourceAddressPrefix "*" `
+    -SourcePortRange "*" `
+    -DestinationAddressPrefix "*" `
+    -DestinationPortRange "3389"
 
-# Create a NSG rule to allow RDP - REMEMBER TO CHANGE "-SourceAddressPrefix" for the current WAN-IP you want to connect from, otherwise everything is allowed and that is not secure. The emperor protects - with the right rules.
-$rdp = New-AzNetworkSecurityRuleConfig -Name "Allow-RDP-FromSourceIP" -Description "Allow RDP From SourceIP" -Access Allow -Protocol Tcp -Direction Inbound -Priority 100 -SourceAddressPrefix * -SourcePortRange * -DestinationAddressPrefix * -DestinationPortRange 3389
+# Add NSG rule to NSG
+$nsg.SecurityRules.Add($nsgRuleRDP)
 
-# Create NSG and assign the rule "Allow-RDP-FromSourceIP.
-$nsg = New-AzNetworkSecurityGroup -ResourceGroupName "MyResourceGroup" -Location "swedencentral" -Name "MyNSG" -SecurityRules $rdp
+# Update NSG with the new rules
+$nsg = Set-AzNetworkSecurityGroup -NetworkSecurityGroup $nsg
 
-# Associate the NSG with the subnet created earlier.
-Set-AzVirtualNetworkSubnetConfig -VirtualNetwork $vnet -Name "MySubnet" -AddressPrefix "10.0.0.0/24" -NetworkSecurityGroup $nsg
+# Create Public IP Address
+$publicIp = New-AzPublicIpAddress `
+    -Name $publicIpName `
+    -ResourceGroupName $resourceGroupName `
+    -Location $location `
+    -AllocationMethod Static
 
-# Create a network interface card with the valid subnet ID
-if ($vnet.Subnets.Count -gt 0) {
-    $nic = New-AzNetworkInterface -Name $nicName -ResourceGroupName $resourceGroupName -Location $location -SubnetId $vnet.Subnets[0].Id -PublicIpAddressId $publicIp.Id
-} else {
-    Write-Error "Cannot create NIC because the subnet ID is null or empty."
-    return
-}
+# Create Network Interface (NIC) with NSG and Public IP
+$nic = New-AzNetworkInterface `
+    -Name $nicName `
+    -ResourceGroupName $resourceGroupName `
+    -Location $location `
+    -SubnetId $vnet.Subnets[0].Id `
+    -NetworkSecurityGroupId $nsg.Id `
+    -PublicIpAddressId $publicIp.Id
 
-# Define the VM configuration without specifying custom OS disk size
-$vmConfig = New-AzVMConfig -VMName $vmName -VMSize $vmSize |
-    Set-AzVMOperatingSystem -Windows -ComputerName $vmName -Credential $adminCredential |
-    Set-AzVMSourceImage -PublisherName "MicrosoftWindowsServer" -Offer "WindowsServer" -Skus "2019-Datacenter" -Version "latest" |
-    Add-AzVMNetworkInterface -Id $nic.Id |
-    Set-AzVMOSDisk -Name $osDiskName -CreateOption FromImage -StorageAccountType $osDiskType
+# Define VM configuration
+$vmConfig = New-AzVMConfig `
+    -VMName $vmName `
+    -VMSize $vmSize |
+    Set-AzVMOperatingSystem `
+    -Windows `
+    -ComputerName $vmName `
+    -Credential $adminCredential |
+    Set-AzVMSourceImage `
+    -PublisherName "MicrosoftWindowsServer" `
+    -Offer "WindowsServer" `
+    -Skus "2019-Datacenter" `
+    -Version "latest" |
+    Add-AzVMNetworkInterface `
+    -Id $nic.Id
+
+# Configure the OS Disk
+$vmConfig = Set-AzVMOSDisk `
+    -VM $vmConfig `
+    -Name $osDiskName `
+    -CreateOption "FromImage" ` 
+    -Caching "ReadWrite" `
+    -StorageAccountType "osDiskType"
 
 # Disable Boot Diagnostics
 $vmConfig = Set-AzVMBootDiagnostic -VM $vmConfig -Enable $false
 
 # Deploy the VM
-New-AzVM -ResourceGroupName $resourceGroupName -Location $location -VM $vmConfig
+New-AzVM `
+    -ResourceGroupName $resourceGroupName `
+    -Location $location `
+    -VM $vmConfig
+
+# Output the created resources details
+Write-Output "VM '$vmName' with VNet '$vnetName', Subnet '$subnetName', NIC '$nicName', and NSG '$nsgName' created successfully in resource group '$resourceGroupName'."
