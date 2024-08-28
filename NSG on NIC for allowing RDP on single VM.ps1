@@ -1,4 +1,4 @@
-#Updated version to create a VM and NSG-rule that would allow RDP. Set a trusted IP-adress in "-AdressPrefix" for more security.
+#Updated version for LAB-1 to create a VM and NSG-rule that would allow RDP. Set a trusted IP-adress in "-AdressPrefix" for more security.
 
 # Authenticate to Azure
 Connect-AzAccount
@@ -103,7 +103,7 @@ $vmConfig = Set-AzVMOSDisk `
     -Name $osDiskName `
     -CreateOption "FromImage" `
     -Caching "ReadWrite" `
-    -StorageAccountType @osDiskType
+    -StorageAccountType $osDiskType
 
 # Disable Boot Diagnostics
 $vmConfig = Set-AzVMBootDiagnostic -VM $vmConfig -Enable $false
