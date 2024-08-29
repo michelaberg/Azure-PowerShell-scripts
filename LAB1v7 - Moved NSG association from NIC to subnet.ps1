@@ -12,9 +12,9 @@ $nsgName = "MyNSG"
 $nicName = "MyNIC"
 $publicIpName = "MyPublicIP"
 $vmName = "MyVM"
-$vmSize = "Standard_B1s"
+$vmSize = "Standard_B2s"
 $osDiskName = "MyVMOSDisk" 
-$osDiskType = "Standard_LRS"
+$osDiskType = "StandardSSD_LRS"
 $adminCredential = Get-Credential -Message "Enter the credentials for the VM admin account"
 
 # Create ResourceGroup.
