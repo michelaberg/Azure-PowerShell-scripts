@@ -1,0 +1,49 @@
+$vmCount = 3
+$resourceGroupName = "MyResourceGroup"  # Replace with your resource group name
+$location = "SwedenCentral"             # Location
+$size = "Standard_B1ls"                 # Smallest VM size
+$publisherName = "Canonical"            # Publisher for Ubuntu
+$offer = "UbuntuServer"                 # Offer for Ubuntu
+$sku = "18_04-lts-gen2"                 # Specific Ubuntu SKU
+$version = "latest"                     # Use "latest" to get the most recent image version
+$osDiskType = "StandardSSD_LRS"
+
+# Create ResourceGroup
+New-AzResourceGroup -Name $resourceGroupName -Location $location
+
+# Create a virtual network and subnet
+$vnet = New-AzVirtualNetwork -ResourceGroupName $resourceGroupName -Location $location -Name "myVNet" -AddressPrefix "10.0.0.0/16"
+$subnet = Add-AzVirtualNetworkSubnetConfig -Name "mySubnet" -AddressPrefix "10.0.0.0/24" -VirtualNetwork $vnet
+$vnet | Set-AzVirtualNetwork
+
+# Retrieve the subnet ID
+$subnetId = (Get-AzVirtualNetwork -ResourceGroupName $resourceGroupName -Name "myVNet").Subnets[0].Id
+
+# Loop to create multiple VMs
+for ($i = 1; $i -le $vmCount; $i++) {
+    # Create a network interface (no public IP and no NSG)
+    $nic = New-AzNetworkInterface -ResourceGroupName $resourceGroupName -Location $location -Name "myNic$i" -SubnetId $subnetId
+
+    # Create VM configuration
+    $vmConfig = New-AzVMConfig -VMName "myUbuntuVM$i" -VMSize $size |
+                Set-AzVMOperatingSystem -Linux -ComputerName "myUbuntuVM$i" -Credential (Get-Credential) |
+                Set-AzVMSourceImage -PublisherName $publisherName -Offer $offer -Sku $sku -Version $version |
+                Add-AzVMNetworkInterface -Id $nic.Id
+
+    # Configure the OS Disk
+    $vmConfig = Set-AzVMOSDisk `
+        -VM $vmConfig `
+        -Name "MyVMOSDisk$i" `
+        -CreateOption "FromImage" `
+        -Caching "ReadWrite" `
+        -StorageAccountType $osDiskType
+
+    # Disable Boot Diagnostics
+    $vmConfig = Set-AzVMBootDiagnostic -VM $vmConfig -Enable $false
+
+    # Deploy the VM
+    New-AzVM `
+        -ResourceGroupName $resourceGroupName `
+        -Location $location `
+        -VM $vmConfig
+}
